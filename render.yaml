@@ -8,4 +8,8 @@ services:
     envVars:
       - key: GEMINI_API_KEY
         sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
     plan: free
