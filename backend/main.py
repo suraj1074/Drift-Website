@@ -64,6 +64,7 @@ class FocusResponse(BaseModel):
     greeting: str
     actions: list[FocusAction]
     parked: list[str]   # Things deliberately deprioritized today
+    source: str = "ai"  # "ai" or "fallback" — tells the app whether to cache
 
 
 # --- Endpoints ---
@@ -116,7 +117,7 @@ async def daily_focus(req: FocusRequest):
 
     if not client:
         log.info("[daily-focus] No AI client — using fallback")
-        result = _fallback_focus(req.items, req.goals)
+        result = _fallback_focus(req.items, req.goals, source="fallback")
         log.info(f"[daily-focus] RESPONSE (fallback): {result.model_dump_json()}")
         return result
 
@@ -140,12 +141,13 @@ async def daily_focus(req: FocusRequest):
             greeting=data.get("greeting", "Hey! Here's your focus for today."),
             actions=[FocusAction(**a) for a in data.get("actions", [])],
             parked=data.get("parked", []),
+            source="ai",
         )
         log.info(f"[daily-focus] RESPONSE: {result.model_dump_json()}")
         return result
     except Exception as e:
         log.error(f"[daily-focus] AI ERROR: {e}")
-        result = _fallback_focus(req.items, req.goals)
+        result = _fallback_focus(req.items, req.goals, source="fallback")
         log.info(f"[daily-focus] RESPONSE (fallback): {result.model_dump_json()}")
         return result
 
@@ -198,24 +200,27 @@ def _fallback_parse(text: str) -> list[DumpItem]:
     return [DumpItem(text=e, category="task") for e in entries]
 
 
-def _fallback_focus(items: list[FocusItem], goals: list[FocusGoal]) -> FocusResponse:
+def _fallback_focus(items: list[FocusItem], goals: list[FocusGoal], source: str = "fallback") -> FocusResponse:
     if items:
         stale = sorted(items, key=lambda i: i.last_touched_at)[0]
         return FocusResponse(
             greeting="Hey! Here's what I'd focus on today.",
             actions=[FocusAction(text=stale.text, why="This has been sitting untouched the longest.", goal=None)],
             parked=[i.text for i in items if i.text != stale.text][:3],
+            source=source,
         )
     if goals:
         return FocusResponse(
             greeting="You've set some goals — nice!",
             actions=[FocusAction(text="Add a few tasks to your plate", why="Goals need small steps to get started.", goal=goals[0].text)],
             parked=[],
+            source=source,
         )
     return FocusResponse(
         greeting="Nothing on your plate yet.",
         actions=[FocusAction(text="Dump whatever's on your mind", why="That's how we figure out what matters.", goal=None)],
         parked=[],
+        source=source,
     )
 
 
