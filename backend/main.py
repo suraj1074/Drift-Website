@@ -32,15 +32,29 @@ MODEL = "gemini-2.5-flash"
 
 # --- Models ---
 
+class ExistingItem(BaseModel):
+    id: int
+    text: str
+    category: str | None = None
+    is_goal: bool = False
+
 class DumpRequest(BaseModel):
     text: str
+    existing_items: list[ExistingItem] = []
 
-class DumpItem(BaseModel):
+class DumpNewItem(BaseModel):
     text: str
-    category: str
+    category: str           # "task" or "goal"
+    goal_horizon: str | None = None  # "week", "month", "quarter" — only for goals
+    parent_goal: str | None = None   # text of the goal this task serves
+
+class DumpUpdate(BaseModel):
+    id: int                 # ID of the existing item
+    action: str             # "touch", "done", "let_go"
 
 class DumpResponse(BaseModel):
-    items: list[DumpItem]
+    new_items: list[DumpNewItem] = []
+    updates: list[DumpUpdate] = []
 
 class FocusItem(BaseModel):
     text: str
@@ -72,18 +86,19 @@ class FocusResponse(BaseModel):
 @app.post("/parse-dump", response_model=DumpResponse)
 async def parse_dump(req: DumpRequest):
     log.info(f"[parse-dump] REQUEST: {req.text[:200]}")
+    log.info(f"[parse-dump] EXISTING: {[(e.id, e.text) for e in req.existing_items]}")
 
     if not req.text.strip():
         raise HTTPException(400, "Empty dump")
 
     if not client:
         log.info("[parse-dump] No AI client — using fallback")
-        result = DumpResponse(items=_fallback_parse(req.text))
+        result = _fallback_parse(req.text)
         log.info(f"[parse-dump] RESPONSE (fallback): {result.model_dump_json()}")
         return result
 
     try:
-        prompt = f"{PARSE_SYSTEM_PROMPT}\n\nUser's brain dump:\n{req.text}"
+        prompt = _build_parse_prompt(req.text, req.existing_items)
         log.info(f"[parse-dump] AI PROMPT: {prompt}")
 
         resp = client.models.generate_content(
@@ -91,20 +106,22 @@ async def parse_dump(req: DumpRequest):
             contents=prompt,
             config={
                 "temperature": 0.3,
-                "max_output_tokens": 1024,
+                "max_output_tokens": 2048,
                 "response_mime_type": "application/json",
             },
         )
         log.info(f"[parse-dump] AI RAW RESPONSE: {resp.text}")
 
         data = json.loads(resp.text)
-        items = [DumpItem(**i) for i in data.get("items", [])]
-        result = DumpResponse(items=items if items else _fallback_parse(req.text))
+        result = DumpResponse(
+            new_items=[DumpNewItem(**i) for i in data.get("new_items", [])],
+            updates=[DumpUpdate(**u) for u in data.get("updates", [])],
+        )
         log.info(f"[parse-dump] RESPONSE: {result.model_dump_json()}")
         return result
     except Exception as e:
         log.error(f"[parse-dump] AI ERROR: {e}")
-        result = DumpResponse(items=_fallback_parse(req.text))
+        result = _fallback_parse(req.text)
         log.info(f"[parse-dump] RESPONSE (fallback): {result.model_dump_json()}")
         return result
 
@@ -160,14 +177,39 @@ async def health():
 
 # --- Prompts ---
 
-PARSE_SYSTEM_PROMPT = """You extract structured items from a brain dump.
-Return JSON with an "items" array. Each item has:
-- "text": the task/idea cleaned up into a short actionable phrase
-- "category": one of "task", "goal", "idea", "obligation"
+PARSE_SYSTEM_PROMPT = """You are Drift's brain dump parser. You understand natural language about tasks, goals, and progress updates.
 
-Be smart about splitting. "Buy groceries like milk and eggs" is ONE item, not two.
-"File taxes and finish the book" is TWO items.
-Keep the user's intent intact. Don't invent things they didn't say."""
+You receive the user's brain dump AND their existing items/goals. Your job is to figure out:
+1. What's NEW (tasks, goals, ideas) that should be added
+2. What's an UPDATE on something that already exists (progress, completion, abandonment)
+
+Return JSON with this exact structure:
+{
+  "new_items": [
+    {
+      "text": "Short actionable phrase",
+      "category": "task" or "goal",
+      "goal_horizon": "week" or "month" or "quarter" (only if category is "goal", else null),
+      "parent_goal": "Text of the existing goal this task serves (or null)"
+    }
+  ],
+  "updates": [
+    {
+      "id": 123,
+      "action": "touch" or "done" or "let_go"
+    }
+  ]
+}
+
+Rules:
+- If the user mentions completing or finishing something that matches an existing item, that's an update with action "done", NOT a new item.
+- If the user reports progress on an existing item (e.g. "I gathered the documents"), mark it as "touch" and create new next-step tasks if mentioned.
+- If something has a deadline or is outcome-shaped (e.g. "File taxes by March 31"), it's a "goal" not a "task".
+- Tasks that clearly serve a goal should have "parent_goal" set to that goal's text.
+- Be smart about splitting. "Buy groceries like milk and eggs" is ONE item. "File taxes and finish the book" is TWO.
+- Don't create duplicate items that already exist.
+- Ignore conversational fluff like "thanks drift" or "hey".
+- Keep the user's intent intact. Don't invent things they didn't say."""
 
 FOCUS_SYSTEM_PROMPT = """You are Drift, a calm and thoughtful AI companion.
 Look at everything on someone's plate and their goals, then decide what they should focus on TODAY.
@@ -195,9 +237,26 @@ Rules:
 
 # --- Fallbacks ---
 
-def _fallback_parse(text: str) -> list[DumpItem]:
+def _fallback_parse(text: str) -> DumpResponse:
     entries = [e.strip() for e in text.replace("\n", ",").split(",") if len(e.strip()) > 2]
-    return [DumpItem(text=e, category="task") for e in entries]
+    return DumpResponse(
+        new_items=[DumpNewItem(text=e, category="task") for e in entries],
+        updates=[],
+    )
+
+
+def _build_parse_prompt(text: str, existing: list[ExistingItem]) -> str:
+    parts = [PARSE_SYSTEM_PROMPT]
+    if existing:
+        items_text = "\n".join(
+            f"- [id={e.id}] {e.text} ({'goal' if e.is_goal else e.category or 'task'})"
+            for e in existing
+        )
+        parts.append(f"\nEXISTING ITEMS & GOALS:\n{items_text}")
+    else:
+        parts.append("\nEXISTING ITEMS & GOALS:\nNone yet.")
+    parts.append(f"\nUSER'S BRAIN DUMP:\n{text}")
+    return "\n".join(parts)
 
 
 def _fallback_focus(items: list[FocusItem], goals: list[FocusGoal], source: str = "fallback") -> FocusResponse:
