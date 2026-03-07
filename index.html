@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drift — Stop Letting Things Silently Slip Away</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: #1a1a2e;
+      background: #fafafa;
+      line-height: 1.7;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+    }
+
+    .hero .logo {
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #6c63ff;
+      margin-bottom: 24px;
+    }
+
+    .hero h1 {
+      font-size: 44px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 24px;
+      color: #1a1a2e;
+    }
+
+    .hero .subtitle {
+      font-size: 20px;
+      color: #555;
+      max-width: 560px;
+      margin: 0 auto 40px;
+    }
+
+    .cta-box {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .cta-box input {
+      padding: 14px 20px;
+      font-size: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      width: 280px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .cta-box input:focus {
+      border-color: #6c63ff;
+    }
+
+    .cta-box button, .btn-primary {
+      padding: 14px 32px;
+      font-size: 16px;
+      background: #6c63ff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .cta-box button:hover, .btn-primary:hover {
+      background: #5a52d5;
+    }
+
+    .cta-note {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #999;
+    }
+
+    .success-msg {
+      display: none;
+      margin-top: 16px;
+      padding: 12px 20px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border-radius: 8px;
+      font-size: 15px;
+    }
+
+    /* Survey overlay */
+    .survey-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .survey-overlay.active {
+      display: flex;
+    }
+
+    .survey-box {
+      background: white;
+      border-radius: 16px;
+      padding: 40px 36px;
+      max-width: 520px;
+      width: 100%;
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .survey-close {
+      position: absolute;
+      top: 16px;
+      right: 20px;
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: #999;
+    }
+
+    .survey-progress {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 32px;
+    }
+
+    .survey-progress .dot {
+      height: 4px;
+      flex: 1;
+      border-radius: 2px;
+      background: #e0e0e0;
+      transition: background 0.3s;
+    }
+
+    .survey-progress .dot.filled {
+      background: #6c63ff;
+    }
+
+    .survey-question {
+      display: none;
+    }
+
+    .survey-question.active {
+      display: block;
+    }
+
+    .survey-question h3 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .survey-question .q-sub {
+      font-size: 15px;
+      color: #888;
+      margin-bottom: 24px;
+    }
+
+    .survey-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .survey-options label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border: 2px solid #eee;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .survey-options label:hover {
+      border-color: #d4d0ff;
+      background: #faf9ff;
+    }
+
+    .survey-options input[type="radio"] {
+      accent-color: #6c63ff;
+      width: 18px;
+      height: 18px;
+    }
+
+    .survey-options input[type="radio"]:checked + span {
+      color: #1a1a2e;
+    }
+
+    .survey-options label:has(input:checked) {
+      border-color: #6c63ff;
+      background: #f0eeff;
+    }
+
+    .survey-nav {
+      margin-top: 28px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    /* Result screen */
+    .survey-result {
+      display: none;
+      text-align: center;
+    }
+
+    .survey-result.active {
+      display: block;
+    }
+
+    .result-score {
+      font-size: 56px;
+      margin-bottom: 8px;
+    }
+
+    .result-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .result-desc {
+      font-size: 16px;
+      color: #555;
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    .result-cta {
+      margin-top: 8px;
+    }
+
+    .result-cta .cta-box {
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 600px) {
+      .survey-box { padding: 28px 20px; }
+      .survey-question h3 { font-size: 19px; }
+    }
+
+    /* Problem */
+    .problem {
+      padding: 60px 0;
+    }
+
+    .section-label {
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #6c63ff;
+      margin-bottom: 16px;
+    }
+
+    .problem h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .problem p {
+      font-size: 18px;
+      color: #555;
+      margin-bottom: 16px;
+    }
+
+    .examples {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .example-card {
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      padding: 20px 24px;
+      font-size: 16px;
+      color: #444;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .example-card .icon {
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    /* How it works */
+    .how {
+      padding: 60px 0;
+    }
+
+    .how h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 32px;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .step {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    .step-num {
+      width: 40px;
+      height: 40px;
+      background: #6c63ff;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .step-content h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .step-content p {
+      font-size: 16px;
+      color: #666;
+    }
+
+    /* Difference */
+    .difference {
+      padding: 60px 0;
+    }
+
+    .difference h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .difference > p {
+      font-size: 18px;
+      color: #555;
+      margin-bottom: 28px;
+    }
+
+    .diff-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .diff-card {
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .diff-card.highlight {
+      background: #f0eeff;
+      border-color: #d4d0ff;
+    }
+
+    .diff-card h4 {
+      font-size: 15px;
+      color: #999;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .diff-card.highlight h4 {
+      color: #6c63ff;
+    }
+
+    .diff-card p {
+      font-size: 16px;
+      color: #333;
+    }
+
+    /* Bottom CTA */
+    .bottom-cta {
+      padding: 60px 0 80px;
+      text-align: center;
+    }
+
+    .bottom-cta h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .bottom-cta p {
+      font-size: 18px;
+      color: #555;
+      margin-bottom: 32px;
+    }
+
+    /* Footer */
+    footer {
+      padding: 24px 0;
+      text-align: center;
+      font-size: 13px;
+      color: #bbb;
+      border-top: 1px solid #eee;
+    }
+
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 32px; }
+      .hero .subtitle { font-size: 17px; }
+      .cta-box input { width: 100%; }
+      .cta-box { flex-direction: column; align-items: center; }
+      .diff-grid { grid-template-columns: 1fr; }
+      .problem h2, .how h2, .difference h2, .bottom-cta h2 { font-size: 26px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="container">
+      <div class="logo">Drift</div>
+      <h1>Stop letting things silently slip away</h1>
+      <p class="subtitle">An AI companion that remembers what you care about, tells you what to focus on, and won't let your intentions quietly die.</p>
+      <button class="btn-primary" onclick="openSurvey()">Is this app for you? Take a 30-second quiz →</button>
+    </div>
+  </section>
+
+  <!-- Problem -->
+  <section class="problem">
+    <div class="container">
+      <div class="section-label">The Problem</div>
+      <h2>You don't lack ambition. You lack follow-through.</h2>
+      <p>You start things with energy. A book, a fitness routine, a side project, a financial plan. Then life happens. Slowly, silently, they fade. Not because you decided to stop — you just... stopped.</p>
+      <p>Sound familiar?</p>
+      <div class="examples">
+        <div class="example-card">
+          <span class="icon">📖</span>
+          <span>Started a book 2 months ago. Still on chapter 5.</span>
+        </div>
+        <div class="example-card">
+          <span class="icon">💰</span>
+          <span>Said you'd plan taxes early this year. It's already late.</span>
+        </div>
+        <div class="example-card">
+          <span class="icon">🏃</span>
+          <span>Ran a 5k last month. Haven't run since.</span>
+        </div>
+        <div class="example-card">
+          <span class="icon">💻</span>
+          <span>Had a great idea for a project. It's still just an idea.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="how">
+    <div class="container">
+      <div class="section-label">How It Works</div>
+      <h2>Clarity in 3 steps</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Dump everything on your mind</h3>
+            <p>Tasks, goals, ideas, obligations — don't organize, just talk. Text or voice. The AI understands context and sorts it for you.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Set what matters this week or month</h3>
+            <p>Tell the app what success looks like. "File my taxes and get back into running." That becomes the lens for everything.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Get told what to do — not a list, a decision</h3>
+            <p>Every day, the app picks the 1-2 things that matter most. If something starts slipping, it nudges you. If you've been ignoring something, it asks: still want this?</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Difference -->
+  <section class="difference">
+    <div class="container">
+      <div class="section-label">Why This Is Different</div>
+      <h2>Not another to-do app</h2>
+      <p>To-do apps manage tasks. Drift manages your attention over time.</p>
+      <div class="diff-grid">
+        <div class="diff-card">
+          <h4>To-do apps</h4>
+          <p>Organize tasks for today</p>
+        </div>
+        <div class="diff-card highlight">
+          <h4>Drift</h4>
+          <p>Tracks commitments over weeks and months</p>
+        </div>
+        <div class="diff-card">
+          <h4>To-do apps</h4>
+          <p>You decide what to do next</p>
+        </div>
+        <div class="diff-card highlight">
+          <h4>Drift</h4>
+          <p>AI decides what matters most right now</p>
+        </div>
+        <div class="diff-card">
+          <h4>To-do apps</h4>
+          <p>Silent when you stop showing up</p>
+        </div>
+        <div class="diff-card highlight">
+          <h4>Drift</h4>
+          <p>Notices drift and nudges before things die</p>
+        </div>
+        <div class="diff-card">
+          <h4>To-do apps</h4>
+          <p>Lists grow endlessly</p>
+        </div>
+        <div class="diff-card highlight">
+          <h4>Drift</h4>
+          <p>Forces a choice: continue, pause, or let go</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bottom CTA -->
+  <section class="bottom-cta">
+    <div class="container">
+      <h2>Like having a thoughtful friend with perfect memory and zero judgment</h2>
+      <p>Curious if Drift is for you? Answer 4 quick questions and find out.</p>
+      <button class="btn-primary" onclick="openSurvey()">Take the quiz — 30 seconds →</button>
+    </div>
+  </section>
+
+  <!-- Survey Overlay -->
+  <div class="survey-overlay" id="surveyOverlay" role="dialog" aria-modal="true" aria-label="Quick quiz">
+    <div class="survey-box">
+      <button class="survey-close" onclick="closeSurvey()" aria-label="Close quiz">&times;</button>
+
+      <div class="survey-progress" id="progressDots"></div>
+
+      <!-- Q1 -->
+      <div class="survey-question active" data-q="0">
+        <h3>How often do you start something and quietly abandon it?</h3>
+        <p class="q-sub">Books, projects, fitness plans, financial goals...</p>
+        <div class="survey-options">
+          <label><input type="radio" name="q0" value="3"><span>All the time — it's a pattern</span></label>
+          <label><input type="radio" name="q0" value="2"><span>Often enough that it bothers me</span></label>
+          <label><input type="radio" name="q0" value="1"><span>Sometimes, but I mostly follow through</span></label>
+          <label><input type="radio" name="q0" value="0"><span>Rarely — I finish what I start</span></label>
+        </div>
+        <div class="survey-nav">
+          <button class="btn-primary" onclick="nextQuestion()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Q2 -->
+      <div class="survey-question" data-q="1">
+        <h3>When you have a free hour, do you know what to spend it on?</h3>
+        <p class="q-sub">Not what's fun — what actually moves you forward.</p>
+        <div class="survey-options">
+          <label><input type="radio" name="q1" value="3"><span>No — I usually scroll or do whatever feels easy</span></label>
+          <label><input type="radio" name="q1" value="2"><span>I have a vague idea but rarely act on it</span></label>
+          <label><input type="radio" name="q1" value="1"><span>Sometimes I pick the right thing</span></label>
+          <label><input type="radio" name="q1" value="0"><span>Yes — I always know my priorities</span></label>
+        </div>
+        <div class="survey-nav">
+          <button class="btn-primary" onclick="nextQuestion()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Q3 -->
+      <div class="survey-question" data-q="2">
+        <h3>Do important-but-not-urgent things keep getting pushed?</h3>
+        <p class="q-sub">Tax planning, health checkups, learning something new, calling a friend...</p>
+        <div class="survey-options">
+          <label><input type="radio" name="q2" value="3"><span>Yes — they only happen when it's almost too late</span></label>
+          <label><input type="radio" name="q2" value="2"><span>Often — I know I should but I don't</span></label>
+          <label><input type="radio" name="q2" value="1"><span>Occasionally</span></label>
+          <label><input type="radio" name="q2" value="0"><span>No — I stay on top of these</span></label>
+        </div>
+        <div class="survey-nav">
+          <button class="btn-primary" onclick="nextQuestion()">Next →</button>
+        </div>
+      </div>
+
+      <!-- Q4 -->
+      <div class="survey-question" data-q="3">
+        <h3>Have you tried to-do apps or planners before?</h3>
+        <p class="q-sub">Todoist, Notion, Apple Reminders, a paper planner...</p>
+        <div class="survey-options">
+          <label><input type="radio" name="q3" value="3"><span>Yes, several — I always abandon them too</span></label>
+          <label><input type="radio" name="q3" value="2"><span>A couple — they helped for a while then stopped</span></label>
+          <label><input type="radio" name="q3" value="1"><span>One or two — they work okay</span></label>
+          <label><input type="radio" name="q3" value="0"><span>No, I haven't really tried</span></label>
+        </div>
+        <div class="survey-nav">
+          <button class="btn-primary" onclick="showResult()">See my result →</button>
+        </div>
+      </div>
+
+      <!-- Result: High match -->
+      <div class="survey-result" id="result-high">
+        <div class="result-score">🎯</div>
+        <div class="result-title">Drift is built for people like you.</div>
+        <p class="result-desc">You start with good intentions but things slip through the cracks. You've tried tools before and they didn't stick. Drift is different — it doesn't just organize tasks, it watches what's drifting and keeps you honest. No guilt, just clarity.</p>
+        <div class="result-cta">
+          <div class="cta-box">
+            <input type="email" id="email-result-high" placeholder="Your email" aria-label="Email address">
+            <button onclick="handleSignup('email-result-high', 'success-result-high')">Get Early Access</button>
+          </div>
+          <p class="cta-note">No spam. We'll reach out when it's ready.</p>
+          <div class="success-msg" id="success-result-high">You're in. We'll be in touch soon.</div>
+        </div>
+      </div>
+
+      <!-- Result: Medium match -->
+      <div class="survey-result" id="result-mid">
+        <div class="result-score">🤔</div>
+        <div class="result-title">You might benefit from Drift.</div>
+        <p class="result-desc">You're not completely lost, but things do slip sometimes. Drift could help you stay on track with the stuff that matters most — especially the things that are easy to push off. Worth a try?</p>
+        <div class="result-cta">
+          <div class="cta-box">
+            <input type="email" id="email-result-mid" placeholder="Your email" aria-label="Email address">
+            <button onclick="handleSignup('email-result-mid', 'success-result-mid')">Sure, keep me posted</button>
+          </div>
+          <p class="cta-note">No spam. We'll reach out when it's ready.</p>
+          <div class="success-msg" id="success-result-mid">Nice — we'll keep you in the loop.</div>
+        </div>
+      </div>
+
+      <!-- Result: Low match -->
+      <div class="survey-result" id="result-low">
+        <div class="result-score">✅</div>
+        <div class="result-title">Looks like you've got things under control.</div>
+        <p class="result-desc">You seem to follow through on what matters and know your priorities. Drift is built for people who struggle with that — but if you're curious, you're welcome to check it out when it launches.</p>
+        <div class="result-cta">
+          <div class="cta-box">
+            <input type="email" id="email-result-low" placeholder="Your email (optional)" aria-label="Email address">
+            <button onclick="handleSignup('email-result-low', 'success-result-low')">Notify me anyway</button>
+          </div>
+          <div class="success-msg" id="success-result-low">Got it — we'll let you know.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">&copy; 2026 Drift. All rights reserved.</div>
+  </footer>
+
+  <script>
+    const totalQuestions = 4;
+    let currentQ = 0;
+
+    function buildDots() {
+      const container = document.getElementById('progressDots');
+      container.innerHTML = '';
+      for (let i = 0; i < totalQuestions; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (i <= currentQ ? ' filled' : '');
+        container.appendChild(dot);
+      }
+    }
+
+    function openSurvey() {
+      currentQ = 0;
+      // Reset all questions
+      document.querySelectorAll('.survey-question').forEach(q => q.classList.remove('active'));
+      document.querySelectorAll('.survey-result').forEach(r => r.classList.remove('active'));
+      document.querySelectorAll('.survey-options input').forEach(i => i.checked = false);
+      document.querySelector('[data-q="0"]').classList.add('active');
+      document.getElementById('surveyOverlay').classList.add('active');
+      document.getElementById('progressDots').style.display = 'flex';
+      buildDots();
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSurvey() {
+      document.getElementById('surveyOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    function nextQuestion() {
+      const selected = document.querySelector(`input[name="q${currentQ}"]:checked`);
+      if (!selected) return; // must pick an answer
+
+      document.querySelector(`[data-q="${currentQ}"]`).classList.remove('active');
+      currentQ++;
+      document.querySelector(`[data-q="${currentQ}"]`).classList.add('active');
+      buildDots();
+    }
+
+    function showResult() {
+      const selected = document.querySelector(`input[name="q${currentQ}"]:checked`);
+      if (!selected) return;
+
+      let score = 0;
+      for (let i = 0; i < totalQuestions; i++) {
+        const ans = document.querySelector(`input[name="q${i}"]:checked`);
+        if (ans) score += parseInt(ans.value);
+      }
+
+      document.querySelector(`[data-q="${currentQ}"]`).classList.remove('active');
+      document.getElementById('progressDots').style.display = 'none';
+
+      if (score >= 9) {
+        document.getElementById('result-high').classList.add('active');
+      } else if (score >= 5) {
+        document.getElementById('result-mid').classList.add('active');
+      } else {
+        document.getElementById('result-low').classList.add('active');
+      }
+    }
+
+    function handleSignup(inputId, successId) {
+      const input = document.getElementById(inputId);
+      const success = document.getElementById(successId);
+      const email = input.value.trim();
+
+      if (!email || !email.includes('@')) {
+        input.style.borderColor = '#e53935';
+        return;
+      }
+
+      input.style.display = 'none';
+      input.closest('.cta-box').querySelector('button').style.display = 'none';
+      success.style.display = 'block';
+    }
+
+    // Close on overlay click
+    document.getElementById('surveyOverlay').addEventListener('click', function(e) {
+      if (e.target === this) closeSurvey();
+    });
+
+    // Close on Escape
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeSurvey();
+    });
+  </script>
+
+</body>
+</html>
