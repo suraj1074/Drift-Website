@@ -20,17 +20,22 @@
   - `POST /parse-dump` — Takes raw brain dump text, uses Gemini 2.5 Flash to extract structured items (text + category: task/goal/idea/obligation)
   - `POST /daily-focus` — Takes items + goals, returns structured focus: greeting, 1-2 action cards (what/why/goal), and parked items
   - `GET /health` — Health check showing AI status and model
-- Gemini 2.5 Flash (free tier: 250 req/day, no credit card)
+- Gemini 2.5 Flash (free tier: 20 req/day, no credit card)
 - Fallback logic for all endpoints when AI is unavailable
 - Full request/response logging for debugging
 - CORS enabled for cross-origin access
 - Environment config via `.env` file (python-dotenv)
+
+### Deployment
+- Backend deployed on Render (free tier): `https://drift-api-evce.onrender.com`
+- Render Blueprint (`render.yaml`) for automated deploys from GitHub
+- UptimeRobot ping configured to prevent cold starts
+- Gemini API key set as environment variable on Render
 
 ### Docs
 - `docs/one-pager.md` — Full product one-pager (problem, solution, differentiation, market context)
 
 ## What's Not Done Yet
 - Google Form setup for email collection
-- Hosting (Netlify/Vercel for frontend, Render/Railway for backend)
-- Backend deployment with production Gemini key
+- Frontend hosting (Netlify/Vercel)
 - Rate limiting on API endpoints
