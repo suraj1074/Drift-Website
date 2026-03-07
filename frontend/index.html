@@ -753,7 +753,7 @@
       }
     }
 
-    function handleSignup(inputId, successId) {
+    async function handleSignup(inputId, successId) {
       const input = document.getElementById(inputId);
       const success = document.getElementById(successId);
       const email = input.value.trim();
@@ -761,6 +761,18 @@
       if (!email || !email.includes('@')) {
         input.style.borderColor = '#e53935';
         return;
+      }
+
+      const source = inputId.replace('email-', '');
+
+      try {
+        await fetch('https://drift-api-evce.onrender.com/waitlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, source })
+        });
+      } catch (e) {
+        console.error('Signup failed:', e);
       }
 
       input.style.display = 'none';

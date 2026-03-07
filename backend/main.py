@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
+from supabase import create_client, Client
 
 load_dotenv()
 
@@ -28,6 +29,10 @@ app.add_middleware(
 api_key = os.getenv("GEMINI_API_KEY", "")
 client = genai.Client(api_key=api_key) if api_key else None
 MODEL = "gemini-2.5-flash"
+
+supabase_url = os.getenv("SUPABASE_URL", "")
+supabase_key = os.getenv("SUPABASE_KEY", "")
+supabase: Client | None = create_client(supabase_url, supabase_key) if supabase_url and supabase_key else None
 
 
 # --- Models ---
@@ -80,12 +85,17 @@ class FocusResponse(BaseModel):
     parked: list[str]   # Things deliberately deprioritized today
     source: str = "ai"  # "ai" or "fallback" — tells the app whether to cache
 
+class WaitlistRequest(BaseModel):
+    email: str
+    source: str = "quiz"
+
 
 # --- Endpoints ---
 
 @app.post("/parse-dump", response_model=DumpResponse)
-async def parse_dump(req: DumpRequest):
-    log.info(f"[parse-dump] REQUEST: {req.text[:200]}")
+async def parse_dump(req: DumpRequest, request: Request):
+    device_id = request.headers.get("x-device-id")
+    log.info(f"[parse-dump] REQUEST: {req.text[:200]} (device={device_id})")
     log.info(f"[parse-dump] EXISTING: {[(e.id, e.text) for e in req.existing_items]}")
 
     if not req.text.strip():
@@ -95,6 +105,7 @@ async def parse_dump(req: DumpRequest):
         log.info("[parse-dump] No AI client — using fallback")
         result = _fallback_parse(req.text)
         log.info(f"[parse-dump] RESPONSE (fallback): {result.model_dump_json()}")
+        _log_api_call("parse-dump", req.model_dump(), result.model_dump(), source="fallback", device_id=device_id)
         return result
 
     try:
@@ -118,17 +129,20 @@ async def parse_dump(req: DumpRequest):
             updates=[DumpUpdate(**u) for u in data.get("updates", [])],
         )
         log.info(f"[parse-dump] RESPONSE: {result.model_dump_json()}")
+        _log_api_call("parse-dump", req.model_dump(), result.model_dump(), source="ai", device_id=device_id)
         return result
     except Exception as e:
         log.error(f"[parse-dump] AI ERROR: {e}")
         result = _fallback_parse(req.text)
         log.info(f"[parse-dump] RESPONSE (fallback): {result.model_dump_json()}")
+        _log_api_call("parse-dump", req.model_dump(), result.model_dump(), source="fallback", device_id=device_id)
         return result
 
 
 @app.post("/daily-focus", response_model=FocusResponse)
-async def daily_focus(req: FocusRequest):
-    log.info(f"[daily-focus] REQUEST: items={len(req.items)}, goals={len(req.goals)}")
+async def daily_focus(req: FocusRequest, request: Request):
+    device_id = request.headers.get("x-device-id")
+    log.info(f"[daily-focus] REQUEST: items={len(req.items)}, goals={len(req.goals)} (device={device_id})")
     log.info(f"[daily-focus] ITEMS: {[i.text for i in req.items]}")
     log.info(f"[daily-focus] GOALS: {[g.text for g in req.goals]}")
 
@@ -136,6 +150,7 @@ async def daily_focus(req: FocusRequest):
         log.info("[daily-focus] No AI client — using fallback")
         result = _fallback_focus(req.items, req.goals, source="fallback")
         log.info(f"[daily-focus] RESPONSE (fallback): {result.model_dump_json()}")
+        _log_api_call("daily-focus", req.model_dump(), result.model_dump(), source="fallback", device_id=device_id)
         return result
 
     prompt = f"{FOCUS_SYSTEM_PROMPT}\n\n{_build_focus_prompt(req.items, req.goals)}"
@@ -161,11 +176,13 @@ async def daily_focus(req: FocusRequest):
             source="ai",
         )
         log.info(f"[daily-focus] RESPONSE: {result.model_dump_json()}")
+        _log_api_call("daily-focus", req.model_dump(), result.model_dump(), source="ai", device_id=device_id)
         return result
     except Exception as e:
         log.error(f"[daily-focus] AI ERROR: {e}")
         result = _fallback_focus(req.items, req.goals, source="fallback")
         log.info(f"[daily-focus] RESPONSE (fallback): {result.model_dump_json()}")
+        _log_api_call("daily-focus", req.model_dump(), result.model_dump(), source="fallback", device_id=device_id)
         return result
 
 
@@ -173,6 +190,21 @@ async def daily_focus(req: FocusRequest):
 async def health():
     log.info(f"[health] ai={client is not None}, model={MODEL}")
     return {"status": "ok", "ai": client is not None, "model": MODEL}
+@app.post("/waitlist")
+async def waitlist(req: WaitlistRequest):
+    log.info(f"[waitlist] NEW SIGNUP: {req.email} (source={req.source})")
+    if not supabase:
+        log.error("[waitlist] Supabase not configured")
+        raise HTTPException(500, "Waitlist unavailable")
+    try:
+        supabase.table("waitlist").insert({
+            "email": req.email,
+            "source": req.source,
+        }).execute()
+        return {"status": "ok"}
+    except Exception as e:
+        log.error(f"[waitlist] ERROR: {e}")
+        raise HTTPException(500, "Failed to save signup")
 
 
 # --- Prompts ---
@@ -233,6 +265,24 @@ Rules:
 - Link actions to goals when possible.
 - Put everything else in "parked" so the user knows you haven't forgotten.
 - Keep all text short and warm. No corporate speak."""
+
+
+# --- Helpers ---
+
+def _log_api_call(endpoint: str, request_data: dict, response_data: dict, source: str = "ai", device_id: str | None = None):
+    """Log API request/response to Supabase for observability."""
+    if not supabase:
+        return
+    try:
+        supabase.table("api_logs").insert({
+            "endpoint": endpoint,
+            "request": json.dumps(request_data),
+            "response": json.dumps(response_data),
+            "source": source,
+            "device_id": device_id,
+        }).execute()
+    except Exception as e:
+        log.error(f"[api_logs] Failed to log: {e}")
 
 
 # --- Fallbacks ---
