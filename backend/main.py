@@ -4,6 +4,7 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from google import genai
 from supabase import create_client, Client
@@ -191,6 +192,48 @@ async def daily_focus(req: FocusRequest, request: Request):
 async def health():
     log.info(f"[health] ai={client is not None}, model={MODEL}")
     return {"status": "ok", "ai": client is not None, "model": MODEL}
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy():
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drift — Privacy Policy</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; color: #333; line-height: 1.6; }
+  h1 { color: #7C3AED; }
+  h2 { color: #555; margin-top: 2em; }
+</style>
+</head>
+<body>
+<h1>Drift — Privacy Policy</h1>
+<p><strong>Last updated:</strong> March 2026</p>
+
+<h2>What Drift collects</h2>
+<p>Drift stores your brain dump text, tasks, and goals locally on your device using a local database. When you use AI-powered features (brain dump parsing, daily focus), your text is sent to our backend server for processing.</p>
+
+<h2>How we use your data</h2>
+<p>Your text is sent to Google's Gemini API to generate structured responses (tasks, goals, daily focus suggestions). We do not store your text on our servers — it is processed in real time and discarded. Logs may temporarily contain request data for debugging and are not shared with third parties.</p>
+
+<h2>Data stored on your device</h2>
+<p>All items, goals, and focus history are stored locally on your Android device using Room (SQLite). This data never leaves your device except when you trigger an AI feature.</p>
+
+<h2>Third-party services</h2>
+<p>Drift uses Google's Gemini API (free tier) for AI features. Google's privacy policy applies to data processed by their API. No other third-party analytics, ads, or tracking services are used.</p>
+
+<h2>No account required</h2>
+<p>Drift does not require sign-up, login, or any personal information. No email, name, or location data is collected.</p>
+
+<h2>Data deletion</h2>
+<p>Since all data is stored locally, you can delete everything by clearing the app's data in your Android settings or uninstalling the app.</p>
+
+<h2>Contact</h2>
+<p>Questions? Reach out at <strong>captwist81@gmail.com</strong></p>
+</body>
+</html>"""
 @app.post("/waitlist")
 async def waitlist(req: WaitlistRequest):
     log.info(f"[waitlist] NEW SIGNUP: {req.email} (source={req.source})")
