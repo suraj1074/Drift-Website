@@ -187,6 +187,7 @@ async def daily_focus(req: FocusRequest, request: Request):
 
 
 @app.get("/health")
+@app.head("/health")
 async def health():
     log.info(f"[health] ai={client is not None}, model={MODEL}")
     return {"status": "ok", "ai": client is not None, "model": MODEL}
