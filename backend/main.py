@@ -32,7 +32,7 @@ app.add_middleware(
 # Per-request: user can send X-Gemini-Key header to use Google Gemini directly
 openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
 if openrouter_key:
-    openrouter_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=openrouter_key)
+    openrouter_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=openrouter_key, timeout=90.0)
     log.info("[init] OpenRouter configured (model=openrouter/free)")
 else:
     openrouter_client = None
@@ -332,7 +332,10 @@ def _call_ai(system_prompt: str, user_content: str, temperature: float = 0.5, ma
             max_tokens=max_tokens,
             response_format={"type": "json_object"},
         )
-        return resp.choices[0].message.content, "openrouter"
+        content = resp.choices[0].message.content
+        if content is None:
+            raise RuntimeError("OpenRouter returned empty response (free tier may be at capacity)")
+        return content, "openrouter"
     else:
         raise RuntimeError("No AI provider available")
 
