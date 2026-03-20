@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from google import genai
+from openai import OpenAI
 from supabase import create_client, Client
 
 load_dotenv()
@@ -27,9 +27,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-api_key = os.getenv("GEMINI_API_KEY", "")
-client = genai.Client(api_key=api_key) if api_key else None
-MODEL = "gemini-2.5-flash"
+api_key = os.getenv("OPENROUTER_API_KEY", "")
+client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key) if api_key else None
+MODEL = "openrouter/free"
 
 supabase_url = os.getenv("SUPABASE_URL", "")
 supabase_key = os.getenv("SUPABASE_KEY", "")
@@ -113,18 +113,20 @@ async def parse_dump(req: DumpRequest, request: Request):
         prompt = _build_parse_prompt(req.text, req.existing_items)
         log.info(f"[parse-dump] AI PROMPT: {prompt}")
 
-        resp = client.models.generate_content(
+        resp = client.chat.completions.create(
             model=MODEL,
-            contents=prompt,
-            config={
-                "temperature": 0.3,
-                "max_output_tokens": 2048,
-                "response_mime_type": "application/json",
-            },
+            messages=[
+                {"role": "system", "content": PARSE_SYSTEM_PROMPT},
+                {"role": "user", "content": _build_parse_user_content(req.text, req.existing_items)},
+            ],
+            temperature=0.3,
+            max_tokens=2048,
+            response_format={"type": "json_object"},
         )
-        log.info(f"[parse-dump] AI RAW RESPONSE: {resp.text}")
+        raw_text = resp.choices[0].message.content
+        log.info(f"[parse-dump] AI RAW RESPONSE: {raw_text}")
 
-        data = json.loads(resp.text)
+        data = json.loads(raw_text)
         result = DumpResponse(
             new_items=[DumpNewItem(**i) for i in data.get("new_items", [])],
             updates=[DumpUpdate(**u) for u in data.get("updates", [])],
@@ -154,22 +156,24 @@ async def daily_focus(req: FocusRequest, request: Request):
         _log_api_call("daily-focus", req.model_dump(), result.model_dump(), source="fallback", device_id=device_id)
         return result
 
-    prompt = f"{FOCUS_SYSTEM_PROMPT}\n\n{_build_focus_prompt(req.items, req.goals)}"
-    log.info(f"[daily-focus] AI PROMPT: {prompt}")
+    user_content = _build_focus_prompt(req.items, req.goals)
+    log.info(f"[daily-focus] AI PROMPT: {user_content}")
 
     try:
-        resp = client.models.generate_content(
+        resp = client.chat.completions.create(
             model=MODEL,
-            contents=prompt,
-            config={
-                "temperature": 0.7,
-                "max_output_tokens": 1024,
-                "response_mime_type": "application/json",
-            },
+            messages=[
+                {"role": "system", "content": FOCUS_SYSTEM_PROMPT},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=0.7,
+            max_tokens=1024,
+            response_format={"type": "json_object"},
         )
-        log.info(f"[daily-focus] AI RAW RESPONSE: {resp.text}")
+        raw_text = resp.choices[0].message.content
+        log.info(f"[daily-focus] AI RAW RESPONSE: {raw_text}")
 
-        data = json.loads(resp.text)
+        data = json.loads(raw_text)
         result = FocusResponse(
             greeting=data.get("greeting", "Hey! Here's your focus for today."),
             actions=[FocusAction(**a) for a in data.get("actions", [])],
@@ -216,13 +220,13 @@ async def privacy_policy():
 <p>Drift stores your brain dump text, tasks, and goals locally on your device using a local database. When you use AI-powered features (brain dump parsing, daily focus), your text is sent to our backend server for processing.</p>
 
 <h2>How we use your data</h2>
-<p>Your text is sent to Google's Gemini API to generate structured responses (tasks, goals, daily focus suggestions). We do not store your text on our servers — it is processed in real time and discarded. Logs may temporarily contain request data for debugging and are not shared with third parties.</p>
+<p>Your text is sent to OpenRouter's API to generate structured responses (tasks, goals, daily focus suggestions). We do not store your text on our servers — it is processed in real time and discarded. Logs may temporarily contain request data for debugging and are not shared with third parties.</p>
 
 <h2>Data stored on your device</h2>
 <p>All items, goals, and focus history are stored locally on your Android device using Room (SQLite). This data never leaves your device except when you trigger an AI feature.</p>
 
 <h2>Third-party services</h2>
-<p>Drift uses Google's Gemini API (free tier) for AI features. Google's privacy policy applies to data processed by their API. No other third-party analytics, ads, or tracking services are used.</p>
+<p>Drift uses OpenRouter's API (free tier) for AI features. OpenRouter's privacy policy applies to data processed by their API. No other third-party analytics, ads, or tracking services are used.</p>
 
 <h2>No account required</h2>
 <p>Drift does not require sign-up, login, or any personal information. No email, name, or location data is collected.</p>
@@ -340,15 +344,23 @@ def _fallback_parse(text: str) -> DumpResponse:
 
 
 def _build_parse_prompt(text: str, existing: list[ExistingItem]) -> str:
+    """Build a combined prompt string for logging purposes."""
     parts = [PARSE_SYSTEM_PROMPT]
+    parts.append(_build_parse_user_content(text, existing))
+    return "\n".join(parts)
+
+
+def _build_parse_user_content(text: str, existing: list[ExistingItem]) -> str:
+    """Build just the user content portion for the chat message."""
+    parts = []
     if existing:
         items_text = "\n".join(
             f"- [id={e.id}] {e.text} ({'goal' if e.is_goal else e.category or 'task'})"
             for e in existing
         )
-        parts.append(f"\nEXISTING ITEMS & GOALS:\n{items_text}")
+        parts.append(f"EXISTING ITEMS & GOALS:\n{items_text}")
     else:
-        parts.append("\nEXISTING ITEMS & GOALS:\nNone yet.")
+        parts.append("EXISTING ITEMS & GOALS:\nNone yet.")
     parts.append(f"\nUSER'S BRAIN DUMP:\n{text}")
     return "\n".join(parts)
 
