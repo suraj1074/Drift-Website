@@ -313,11 +313,11 @@
     }
 
     /* How it works */
-    .how {
+    .how, .setup {
       padding: 60px 0;
     }
 
-    .how h2 {
+    .how h2, .setup h2 {
       font-size: 32px;
       font-weight: 700;
       margin-bottom: 32px;
@@ -516,6 +516,39 @@
           </div>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- API Key Setup -->
+  <section class="setup" id="setup">
+    <div class="container">
+      <div class="section-label">Quick Setup</div>
+      <h2>Bring your own AI (it's free)</h2>
+      <p style="font-size: 18px; color: #555; margin-bottom: 24px;">Drift uses Google's Gemini AI. You'll need a free API key — takes about 60 seconds.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Go to Google AI Studio</h3>
+            <p>Visit <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color: #6c63ff; text-decoration: underline;">aistudio.google.com/apikey</a> and sign in with your Google account.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>Create an API key</h3>
+            <p>Click "Create API Key", pick any project (or create one), and copy the key.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>Paste it in Drift</h3>
+            <p>Open the app → tap the ⚙️ icon on the Today screen → paste your key → Save. That's it.</p>
+          </div>
+        </div>
+      </div>
+      <p style="font-size: 14px; color: #999; margin-top: 20px;">The free tier is generous — more than enough for personal use. Your key stays on your device and is only sent to Google's API.</p>
     </div>
   </section>
 
