@@ -27,9 +27,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-api_key = os.getenv("OPENROUTER_API_KEY", "")
-client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key) if api_key else None
-MODEL = "openrouter/free"
+# --- AI Provider Setup ---
+# Default: OPENROUTER_API_KEY from env (free tier)
+# Per-request: user can send X-Gemini-Key header to use Google Gemini directly
+openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+if openrouter_key:
+    openrouter_client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=openrouter_key)
+    log.info("[init] OpenRouter configured (model=openrouter/free)")
+else:
+    openrouter_client = None
+    log.warning("[init] No OPENROUTER_API_KEY — will need per-request Gemini keys or fallback")
 
 supabase_url = os.getenv("SUPABASE_URL", "")
 supabase_key = os.getenv("SUPABASE_KEY", "")
@@ -96,35 +103,25 @@ class WaitlistRequest(BaseModel):
 @app.post("/parse-dump", response_model=DumpResponse)
 async def parse_dump(req: DumpRequest, request: Request):
     device_id = request.headers.get("x-device-id")
-    log.info(f"[parse-dump] REQUEST: {req.text[:200]} (device={device_id})")
+    gemini_key = request.headers.get("x-gemini-key")
+    log.info(f"[parse-dump] REQUEST: {req.text[:200]} (device={device_id}, gemini={'yes' if gemini_key else 'no'})")
     log.info(f"[parse-dump] EXISTING: {[(e.id, e.text) for e in req.existing_items]}")
 
     if not req.text.strip():
         raise HTTPException(400, "Empty dump")
 
-    if not client:
-        log.info("[parse-dump] No AI client — using fallback")
+    if not gemini_key and not openrouter_client:
+        log.info("[parse-dump] No AI available — using fallback")
         result = _fallback_parse(req.text)
         log.info(f"[parse-dump] RESPONSE (fallback): {result.model_dump_json()}")
         _log_api_call("parse-dump", req.model_dump(), result.model_dump(), source="fallback", device_id=device_id)
         return result
 
     try:
-        prompt = _build_parse_prompt(req.text, req.existing_items)
-        log.info(f"[parse-dump] AI PROMPT: {prompt}")
+        user_content = _build_parse_user_content(req.text, req.existing_items)
 
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": PARSE_SYSTEM_PROMPT},
-                {"role": "user", "content": _build_parse_user_content(req.text, req.existing_items)},
-            ],
-            temperature=0.3,
-            max_tokens=2048,
-            response_format={"type": "json_object"},
-        )
-        raw_text = resp.choices[0].message.content
-        log.info(f"[parse-dump] AI RAW RESPONSE: {raw_text}")
+        raw_text, provider = _call_ai(PARSE_SYSTEM_PROMPT, user_content, temperature=0.3, max_tokens=2048, gemini_key=gemini_key)
+        log.info(f"[parse-dump] AI RAW RESPONSE ({provider}): {raw_text}")
 
         data = json.loads(raw_text)
         result = DumpResponse(
@@ -132,7 +129,7 @@ async def parse_dump(req: DumpRequest, request: Request):
             updates=[DumpUpdate(**u) for u in data.get("updates", [])],
         )
         log.info(f"[parse-dump] RESPONSE: {result.model_dump_json()}")
-        _log_api_call("parse-dump", req.model_dump(), result.model_dump(), source="ai", device_id=device_id)
+        _log_api_call("parse-dump", req.model_dump(), result.model_dump(), source=provider, device_id=device_id)
         return result
     except Exception as e:
         log.error(f"[parse-dump] AI ERROR: {e}")
@@ -145,33 +142,23 @@ async def parse_dump(req: DumpRequest, request: Request):
 @app.post("/daily-focus", response_model=FocusResponse)
 async def daily_focus(req: FocusRequest, request: Request):
     device_id = request.headers.get("x-device-id")
-    log.info(f"[daily-focus] REQUEST: items={len(req.items)}, goals={len(req.goals)} (device={device_id})")
+    gemini_key = request.headers.get("x-gemini-key")
+    log.info(f"[daily-focus] REQUEST: items={len(req.items)}, goals={len(req.goals)} (device={device_id}, gemini={'yes' if gemini_key else 'no'})")
     log.info(f"[daily-focus] ITEMS: {[i.text for i in req.items]}")
     log.info(f"[daily-focus] GOALS: {[g.text for g in req.goals]}")
 
-    if not client:
-        log.info("[daily-focus] No AI client — using fallback")
+    if not gemini_key and not openrouter_client:
+        log.info("[daily-focus] No AI available — using fallback")
         result = _fallback_focus(req.items, req.goals, source="fallback")
         log.info(f"[daily-focus] RESPONSE (fallback): {result.model_dump_json()}")
         _log_api_call("daily-focus", req.model_dump(), result.model_dump(), source="fallback", device_id=device_id)
         return result
 
     user_content = _build_focus_prompt(req.items, req.goals)
-    log.info(f"[daily-focus] AI PROMPT: {user_content}")
 
     try:
-        resp = client.chat.completions.create(
-            model=MODEL,
-            messages=[
-                {"role": "system", "content": FOCUS_SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=0.7,
-            max_tokens=1024,
-            response_format={"type": "json_object"},
-        )
-        raw_text = resp.choices[0].message.content
-        log.info(f"[daily-focus] AI RAW RESPONSE: {raw_text}")
+        raw_text, provider = _call_ai(FOCUS_SYSTEM_PROMPT, user_content, temperature=0.7, max_tokens=1024, gemini_key=gemini_key)
+        log.info(f"[daily-focus] AI RAW RESPONSE ({provider}): {raw_text}")
 
         data = json.loads(raw_text)
         result = FocusResponse(
@@ -181,7 +168,7 @@ async def daily_focus(req: FocusRequest, request: Request):
             source="ai",
         )
         log.info(f"[daily-focus] RESPONSE: {result.model_dump_json()}")
-        _log_api_call("daily-focus", req.model_dump(), result.model_dump(), source="ai", device_id=device_id)
+        _log_api_call("daily-focus", req.model_dump(), result.model_dump(), source=provider, device_id=device_id)
         return result
     except Exception as e:
         log.error(f"[daily-focus] AI ERROR: {e}")
@@ -194,8 +181,8 @@ async def daily_focus(req: FocusRequest, request: Request):
 @app.get("/health")
 @app.head("/health")
 async def health():
-    log.info(f"[health] ai={client is not None}, model={MODEL}")
-    return {"status": "ok", "ai": client is not None, "model": MODEL}
+    log.info(f"[health] openrouter={'yes' if openrouter_client else 'no'}")
+    return {"status": "ok", "openrouter": openrouter_client is not None, "gemini": "per-request via X-Gemini-Key header"}
 
 
 @app.get("/privacy", response_class=HTMLResponse)
@@ -220,13 +207,13 @@ async def privacy_policy():
 <p>Drift stores your brain dump text, tasks, and goals locally on your device using a local database. When you use AI-powered features (brain dump parsing, daily focus), your text is sent to our backend server for processing.</p>
 
 <h2>How we use your data</h2>
-<p>Your text is sent to OpenRouter's API to generate structured responses (tasks, goals, daily focus suggestions). We do not store your text on our servers — it is processed in real time and discarded. Logs may temporarily contain request data for debugging and are not shared with third parties.</p>
+<p>Your text is sent to an AI service (Google Gemini or OpenRouter) to generate structured responses (tasks, goals, daily focus suggestions). We do not store your text on our servers — it is processed in real time and discarded. Logs may temporarily contain request data for debugging and are not shared with third parties.</p>
 
 <h2>Data stored on your device</h2>
 <p>All items, goals, and focus history are stored locally on your Android device using Room (SQLite). This data never leaves your device except when you trigger an AI feature.</p>
 
 <h2>Third-party services</h2>
-<p>Drift uses OpenRouter's API (free tier) for AI features. OpenRouter's privacy policy applies to data processed by their API. No other third-party analytics, ads, or tracking services are used.</p>
+<p>Drift uses AI services (Google Gemini or OpenRouter, depending on configuration) for AI features. The respective provider's privacy policy applies to data processed by their API. No other third-party analytics, ads, or tracking services are used.</p>
 
 <h2>No account required</h2>
 <p>Drift does not require sign-up, login, or any personal information. No email, name, or location data is collected.</p>
@@ -313,6 +300,41 @@ Rules:
 - Link actions to goals when possible.
 - Put everything else in "parked" so the user knows you haven't forgotten.
 - Keep all text short and warm. No corporate speak."""
+
+
+# --- Unified AI caller ---
+
+def _call_ai(system_prompt: str, user_content: str, temperature: float = 0.5, max_tokens: int = 1024, gemini_key: str | None = None) -> tuple[str, str]:
+    """Call AI provider. Returns (raw_json_text, provider_name).
+    Uses user's Gemini key if provided, otherwise falls back to OpenRouter."""
+    if gemini_key:
+        from google import genai
+        gc = genai.Client(api_key=gemini_key)
+        prompt = f"{system_prompt}\n\n{user_content}"
+        resp = gc.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config={
+                "temperature": temperature,
+                "max_output_tokens": max_tokens,
+                "response_mime_type": "application/json",
+            },
+        )
+        return resp.text, "gemini"
+    elif openrouter_client:
+        resp = openrouter_client.chat.completions.create(
+            model="openrouter/free",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+        )
+        return resp.choices[0].message.content, "openrouter"
+    else:
+        raise RuntimeError("No AI provider available")
 
 
 # --- Helpers ---
