@@ -1,0 +1,31 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; background: #fafafa; line-height: 1.8; }
+.blog-nav { padding: 20px 24px; max-width: 720px; margin: 0 auto; }
+.blog-nav a { color: #6c63ff; text-decoration: none; font-size: 14px; font-weight: 500; }
+.blog-nav a:hover { text-decoration: underline; }
+article { max-width: 720px; margin: 0 auto; padding: 0 24px 60px; }
+article h1 { font-size: 38px; font-weight: 700; line-height: 1.2; margin-bottom: 12px; }
+.article-meta { font-size: 14px; color: #999; margin-bottom: 40px; }
+article h2 { font-size: 24px; font-weight: 700; margin: 36px 0 12px; }
+article p { font-size: 18px; color: #444; margin-bottom: 20px; }
+article em { color: #666; }
+article strong { color: #1a1a2e; }
+article ul, article ol { margin: 0 0 20px 24px; font-size: 18px; color: #444; }
+article li { margin-bottom: 8px; }
+.highlight-box { background: #f0eeff; border-left: 4px solid #6c63ff; padding: 20px 24px; border-radius: 0 10px 10px 0; margin: 28px 0; font-size: 17px; color: #333; }
+.cta-section { text-align: center; padding: 48px 0 0; border-top: 1px solid #eee; margin-top: 48px; }
+.cta-section p { font-size: 18px; color: #555; margin-bottom: 20px; }
+.cta-section a.btn { display: inline-block; padding: 14px 32px; background: #6c63ff; color: white; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px; transition: background 0.2s; }
+.cta-section a.btn:hover { background: #5a52d5; }
+footer { text-align: center; padding: 24px; font-size: 13px; color: #bbb; }
+footer a { color: #6c63ff; text-decoration: none; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 28px 0; }
+.stat-card { background: white; border: 1px solid #eee; border-radius: 12px; padding: 20px; text-align: center; }
+.stat-card .num { font-size: 32px; font-weight: 700; color: #6c63ff; }
+.stat-card .label { font-size: 14px; color: #888; margin-top: 4px; }
+@media (max-width: 600px) {
+  article h1 { font-size: 28px; }
+  article h2 { font-size: 20px; }
+  article p, article ul, article ol { font-size: 16px; }
+  .stat-grid { grid-template-columns: 1fr; }
+}
