@@ -17,6 +17,10 @@ article li { margin-bottom: 8px; }
 .cta-section p { font-size: 18px; color: #555; margin-bottom: 20px; }
 .cta-section a.btn { display: inline-block; padding: 14px 32px; background: #6c63ff; color: white; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 16px; transition: background 0.2s; }
 .cta-section a.btn:hover { background: #5a52d5; }
+.read-next { margin-top: 36px; padding-top: 24px; border-top: 1px solid #eee; }
+.read-next p { font-size: 13px; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.read-next a { font-size: 18px; color: #6c63ff; text-decoration: none; font-weight: 600; }
+.read-next a:hover { text-decoration: underline; }
 footer { text-align: center; padding: 24px; font-size: 13px; color: #bbb; }
 footer a { color: #6c63ff; text-decoration: none; }
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 28px 0; }
