@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://suraj1074.github.io/Drift-Website/sitemap.xml
