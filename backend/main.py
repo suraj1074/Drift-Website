@@ -4,7 +4,7 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from pydantic import BaseModel
 from openai import OpenAI
 from supabase import create_client, Client
@@ -28,6 +28,10 @@ app.add_middleware(
 )
 
 # --- AI Provider Setup ---
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt():
+    return "User-agent: *\nDisallow: /\n"
 # Default: OPENROUTER_API_KEY from env (free tier)
 # Per-request: user can send X-Gemini-Key header to use Google Gemini directly
 openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
