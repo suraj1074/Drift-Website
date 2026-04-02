@@ -316,22 +316,37 @@ def _call_ai(system_prompt: str, user_content: str, temperature: float = 0.5, ma
             contents=prompt,
             config={
                 "temperature": temperature,
-                "max_output_tokens": max_tokens,
+                "max_output_tokens": 4096,
                 "response_mime_type": "application/json",
             },
         )
-        return resp.text, "gemini"
+        text = resp.text.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        return text, "gemini"
     elif openrouter_client:
-        resp = openrouter_client.chat.completions.create(
-            model="openrouter/free",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-        )
+        try:
+            resp = openrouter_client.chat.completions.create(
+                model="openrouter/free",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+            )
+        except Exception:
+            # Some free models don't support system prompts — merge into user message
+            resp = openrouter_client.chat.completions.create(
+                model="openrouter/free",
+                messages=[
+                    {"role": "user", "content": f"{system_prompt}\n\n{user_content}"},
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_format={"type": "json_object"},
+            )
         content = resp.choices[0].message.content
         if content is None:
             raise RuntimeError("OpenRouter returned empty response (free tier may be at capacity)")
