@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://suraj1074.github.io/Drift-Website/</loc><priority>1.0</priority></url>
-  <url><loc>https://suraj1074.github.io/Drift-Website/blog/</loc><priority>0.8</priority></url>
-  <url><loc>https://suraj1074.github.io/Drift-Website/blog/clarity-not-productivity.html</loc><priority>0.7</priority></url>
-  <url><loc>https://suraj1074.github.io/Drift-Website/blog/3am-thought.html</loc><priority>0.7</priority></url>
-  <url><loc>https://suraj1074.github.io/Drift-Website/blog/30-day-thought-experiment.html</loc><priority>0.7</priority></url>
-  <url><loc>https://suraj1074.github.io/Drift-Website/blog/todo-list-guilt.html</loc><priority>0.7</priority></url>
-  <url><loc>https://suraj1074.github.io/Drift-Website/blog/brain-dump-method.html</loc><priority>0.7</priority></url>
+  <url><loc>https://suraj1074.github.io/Drift-Website/</loc><lastmod>2026-04-02</lastmod><priority>1.0</priority></url>
+  <url><loc>https://suraj1074.github.io/Drift-Website/blog/</loc><lastmod>2026-04-02</lastmod><priority>0.8</priority></url>
+  <url><loc>https://suraj1074.github.io/Drift-Website/blog/clarity-not-productivity.html</loc><lastmod>2026-03-18</lastmod><priority>0.7</priority></url>
+  <url><loc>https://suraj1074.github.io/Drift-Website/blog/3am-thought.html</loc><lastmod>2026-03-22</lastmod><priority>0.7</priority></url>
+  <url><loc>https://suraj1074.github.io/Drift-Website/blog/30-day-thought-experiment.html</loc><lastmod>2026-03-26</lastmod><priority>0.7</priority></url>
+  <url><loc>https://suraj1074.github.io/Drift-Website/blog/todo-list-guilt.html</loc><lastmod>2026-03-30</lastmod><priority>0.7</priority></url>
+  <url><loc>https://suraj1074.github.io/Drift-Website/blog/brain-dump-method.html</loc><lastmod>2026-04-02</lastmod><priority>0.7</priority></url>
 </urlset>
